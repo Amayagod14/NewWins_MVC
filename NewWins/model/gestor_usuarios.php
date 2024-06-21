@@ -56,30 +56,23 @@ class GestorUsuarios
 
     public function iniciarSesionAdmin($correo, $contrasena)
     {
-        if ($_SERVER["REQUEST_METHOD"] == "POST") {
-            if (isset($_POST["emailadmin"]) && isset($_POST["passwordadmin"])) {
-                $stmt = $this->conn->prepare("SELECT contrasena, es_admin FROM usuarios_registrados WHERE correo_electronico = ?");
-                $stmt->bind_param("s", $correo);
-                $stmt->execute();
-                $stmt->bind_result($hash_contrasena, $es_admin);
-                $stmt->fetch();
+        $stmt = $this->conn->prepare("SELECT contrasena, es_admin FROM usuarios_registrados WHERE correo_electronico = ?");
+        $stmt->bind_param("s", $correo);
+        $stmt->execute();
+        $stmt->bind_result($hash_contrasena, $es_admin);
+        $stmt->fetch();
 
-                if (password_verify($contrasena, $hash_contrasena) && $es_admin == 1) {
-                    header("Location: ../view/header.php");
-                    exit();
-                } else {
-                    // Si las credenciales son incorrectas, redirige con un mensaje de error
-                    header("Location: admin.php?error=contrasena");
-                    exit();
-                }
-
-                $stmt->close();
-            } else {
-                // Todos los campos son obligatorios
-                echo "Todos los campos son obligatorios.";
-            }
+        if (password_verify($contrasena, $hash_contrasena) && $es_admin == 1) {
+            // Inicio de sesión exitoso para administrador
+            return true;
+        } else {
+            // Si las credenciales son incorrectas, devuelve false
+            return false;
         }
+
+        $stmt->close();
     }
+
 
     public function registrarUsuario($nombre, $apellido, $nombreUsuario, $correo, $contrasena, $pais)
     {
@@ -168,6 +161,81 @@ class GestorUsuarios
 
         // Cierra la declaración preparada
         $stmt->close();
+    }
+    public static function getUsers()
+    {
+        $conn = ConexionBD::obtenerConexion();
+
+        // Verificar la conexión
+        if ($conn->connect_error) {
+            throw new Exception("Error de conexión: " . $conn->connect_error);
+        }
+
+        // Inicializar la variable $usuarios
+        $usuarios = [];
+
+        // Realizar la consulta SQL para obtener los usuarios
+        $sql = "SELECT nombre_usuario, correo_electronico, es_admin FROM usuarios_registrados";
+        $result = $conn->query($sql);
+
+        // Verificar si se obtuvieron resultados
+        if ($result && $result->num_rows > 0) {
+            $usuarios = $result->fetch_all(MYSQLI_ASSOC); // Obtener todos los resultados como un array asociativo
+        }
+
+        // Cerrar la conexión
+        $conn->close();
+
+        return $usuarios;
+    }
+
+    public static function getUserByEmail($email)
+    {
+
+        // Crear conexión
+        $conn = ConexionBD::obtenerConexion();
+
+        // Inicializar la variable $user
+        $user = null;
+
+        // Preparar y ejecutar la consulta SQL para obtener el usuario por correo electrónico
+        $stmt = $conn->prepare("SELECT nombre_usuario, nombre, apellido, ubicacion, correo_electronico FROM usuarios_registrados WHERE correo_electronico = ?");
+        if ($stmt === false) {
+            throw new Exception("Error preparando la consulta: " . $conn->error);
+        }
+
+        $stmt->bind_param("s", $email);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        // Verificar si se obtuvo un resultado
+        if ($result && $result->num_rows > 0) {
+            $user = $result->fetch_assoc(); // Obtener el resultado como un array asociativo
+        }
+
+        // Cerrar la conexión
+        $stmt->close();
+        $conn->close();
+
+        return $user;
+    }
+    public static function updateUser($currentEmail, $username, $firstName, $lastName, $location, $email)
+    {
+        $conn = ConexionBD::obtenerConexion();
+
+        // Verificar la conexión
+        if ($conn->connect_error) {
+            throw new Exception("Error de conexión: " . $conn->connect_error);
+        }
+
+        // Preparar y ejecutar la consulta SQL para actualizar el usuario
+        $stmt = $conn->prepare("UPDATE usuarios_registrados SET nombre_usuario = ?, nombre = ?, apellido = ?, ubicacion = ?, correo_electronico = ? WHERE correo_electronico = ?");
+        $stmt->bind_param("ssssss", $username, $firstName, $lastName, $location, $email, $currentEmail);
+        $stmt->execute();
+
+        // Cerrar la conexión
+        $stmt->close();
+        $conn->close();
     }
 
 
